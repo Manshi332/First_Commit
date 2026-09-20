@@ -295,3 +295,42 @@ Citizen Confirms or Disputes → Closed / Re-opened
 11. **Supervisor Monitoring** — hotspots, SLA compliance, and the priority brief update continuously.
 12. **Citizen Feedback** — a 👍 closes the loop toward `CITIZEN VERIFIED`/`CLOSED`; a 👎 re-opens the ticket and escalates it to a supervisor.
 ---
+## Technology Stack
+ 
+**Frontend**
+- Streamlit (wide layout, custom CSS design system), PyDeck (heatmap, clusters, markers), pandas, inline SVG icons
+**Backend / application**
+- Python 3.11, dataclasses-based lifecycle state machine, Pydantic schemas
+**AI / ML**
+- Strands Agents SDK with the Ollama model provider (`llama3.2` default, configurable)
+- Ollama vision model (`llava` default) for resolution evidence
+- Rule-based engines for language detection, summaries, hotspots, priority brief
+**Data / storage / search**
+- Streamlit session state (prototype store)
+- OpenSearch (`opensearch-py`), optional full-text search
+**Authorization / security**
+- Cedar policies via `cedarpy` (with Python mirror fallback)
+**Infrastructure / DevOps**
+- Dockerfile (`python:3.11-slim`), compose stack: app + Ollama + LocalStack (SNS) + OpenSearch
+- Finch for build/compose; boto3 for SNS; LocalStack for a local AWS-compatible endpoint
+**Development tools**
+- Pillow (image handling, placeholder photos, EXIF), environment-variable configuration
+## Technology → Where It Is Used
+ 
+| Technology | Where used | Purpose |
+|---|---|---|
+| Python 3.11 | All modules; `Dockerfile` | Application logic |
+| Streamlit | `app.py`, `views.py`, `staff_ui.py`, `layout.py`, `theme.py` | Role-based dashboards, navigation, forms |
+| PyDeck | `geo_intel.py`, `staff_ui.py`, `views.py` | Heatmap, ward clusters, issue markers, click-to-select ward |
+| pandas | `geo_intel.py`, `staff_ui.py`, `views.py` | Map data frames, tables, charts, CSV export |
+| Pillow | `core.py`, `evidence.py` | Demo photos; image sanity checks and EXIF GPS |
+| Pydantic | `grievance_agent.py` | Typed ticket schema for the agent tool |
+| Strands Agents SDK | `grievance_agent.py` | Agent + `@tool emit_orchestrated_ticket` for triage |
+| Ollama (`llama3.2`) | `grievance_agent.py` | Local LLM for the triage agent |
+| Ollama (`llava`) | `evidence.py` | Vision check of resolution photos |
+| Cedar / `cedarpy` | `cedar_eval.py`, `policies.cedar` | Dispatch authorization with explainable decisions |
+| boto3 | `dispatch_notifier.py` | SNS publish |
+| LocalStack (SNS) | compose file, `dispatch_notifier.py` | Local AWS-compatible SNS endpoint |
+| OpenSearch / `opensearch-py` | `opensearch_search.py`, `core.py`, `staff_ui.render_search` | Indexing tickets on every mutation and fuzzy search |
+| Finch / Docker | `Dockerfile`, compose file | Build and run the whole stack |
+| `lifecycle.py` (dataclass) | `core.py`, `staff_ui.py`, `views.py` | State machine and role-checked transitions |
