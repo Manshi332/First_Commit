@@ -1,0 +1,13 @@
+pandas
+pydantic
+boto3
+strands-agents
+ollama
+streamlit>=1.40
+pandas
+pydeck
+pillow
+boto3
+cedarpy
+strands-agents
+pydantic

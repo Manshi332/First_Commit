@@ -1,0 +1,60 @@
+# finch compose up -d
+# Then, one-time setup:
+#   finch compose exec ollama ollama pull llama3.2
+#   finch compose exec ollama ollama pull llava
+#   finch compose exec localstack awslocal sns create-topic --name civictech-dispatch-events
+#
+# This brings up the full Build It stack in containers: the Streamlit app,
+# a local Ollama model server (used by grievance_agent.py via Strands Agents SDK,
+# and by evidence.py's vision check), LocalStack (used by dispatch_notifier.py
+# for SNS), and OpenSearch (used by opensearch_search.py for ticket search) —
+# no AWS account needed anywhere in this file.
+services:
+  civicflow:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL_ID=llama3.2
+      - CIVIC_VISION_MODEL=llava
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - CIVICFLOW_USE_LOCALSTACK=1
+      - OPENSEARCH_HOST=http://opensearch:9200
+      - CIVIC_USE_OPENSEARCH=1
+    depends_on:
+      - ollama
+      - localstack
+      - opensearch
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sns
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+  opensearch:
+    image: opensearchproject/opensearch:2.15.0
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true       # local dev only — never disable security like this in Ship It/production
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+
+volumes:
+  ollama_data:
+  localstack_data:
+  opensearch_data:
