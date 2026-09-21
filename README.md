@@ -16,12 +16,24 @@ A civic issue management platform that connects **citizens, municipal officers, 
 - [Our Solution](#our-solution)
 - [How CivicFlow Works](#how-civicflow-works)
 - [Four Role-Based Experiences](#four-role-based-experiences)
-  - [Citizen](#61-citizen)
-  - [Municipal Officer](#62-municipal-officer)
-  - [Field Technician](#63-field-technician)
-  - [Supervisor](#64-supervisor)
 - [Feature Matrix](#feature-matrix)
 - [System Architecture](#system-architecture)
+- [End-to-End Workflow](#end-to-end-workflow)
+- [AI & Intelligent Automation](#ai--intelligent-automation)
+- [SLA & Escalation Engine](#sla--escalation-engine)
+- [Authorization & Security](#authorization--security)
+- [Technology Stack](#technology-stack)
+- [Technology → Where It Is Used](#technology--where-it-is-used)
+- [Project Structure](#project-structure)
+- [Dashboard Screenshots](#dashboard-screenshots)
+- [How CivicFlow Solves the Problem](#how-civicflow-solves-the-problem)
+- [Why CivicFlow](#why-civicflow)
+- [Quick Demo](#quick-demo)
+- [Getting Started](#getting-started)
+- [Running the Application](#running-the-application)
+- [Future Scope](#future-scope)
+- [Impact](#impact)
+- [Design & UX](#design--ux)
 ---
  
 ## Problem
@@ -97,7 +109,7 @@ At its core, CivicFlow is a **Streamlit application with a single shared in-memo
  
 ## Four Role-Based Experiences
  
-### 6.1 Citizen
+### 1 Citizen
  
 | Feature (as implemented) | What the citizen sees | Why it matters |
 |---|---|---|
@@ -114,7 +126,7 @@ At its core, CivicFlow is a **Streamlit application with a single shared in-memo
  
 ![Citizen Dashboard](docs/images/citizen-dashboard.png)
  
-### 6.2 Municipal Officer
+### 2 Municipal Officer
  
 | Feature (as implemented) | What the officer does |
 |---|---|
@@ -129,7 +141,7 @@ At its core, CivicFlow is a **Streamlit application with a single shared in-memo
  
 ![Municipal Officer Dashboard](docs/images/officer-dashboard.png)
  
-### 6.3 Field Technician
+### 3 Field Technician
  
 | Feature (as implemented) | What the technician does |
 |---|---|
@@ -143,7 +155,7 @@ This role is the bridge between the digital ticket and the physical repair: it t
  
 ![Field Technician Dashboard](docs/images/field-technician-dashboard.png)
  
-### 6.4 Supervisor
+### 4 Supervisor
  
 | Feature (as implemented) | What the supervisor sees |
 |---|---|
@@ -241,17 +253,126 @@ flowchart TB
     Core --> Search
     Lifecycle -->|dispatch authorized| Notify
 ```
- 
-**Layers, as they actually exist in the code:**
- 
-- **Presentation Layer** — `app.py` (entry point/routing), `views.py` (citizen UI + shared command center), `staff_ui.py` (officer/technician/supervisor dashboards), `layout.py` (design system CSS, header, sidebar), `theme.py` (theme CSS, stat cards, topbars).
-- **AI Layer** — `grievance_agent.py` + `prompts.py` (LLM triage agent, with a deterministic rule-based fallback path), `ai_insights.py` (language detection, case summaries, priority brief — all rule/dictionary-based, no ML model), `hotspots.py` (deterministic 24h-vs-24h scoring), `evidence.py` (vision-model or heuristic photo verification).
-- **Application / Workflow Layer** — `lifecycle.py`, the ticket state machine every ticket moves through.
-- **SLA / Escalation Layer** — `sla_escalation.py`, which tracks SLA targets/breaches per ticket and drives automatic escalation.
-- **Authorization Layer** — `cedar_eval.py` + `policies.cedar`, gating the one action in the system with real financial/operational consequence: dispatching a crew.
-- **Data / Persistence Layer** — `core.py`, holding all ticket state in Streamlit's session state; `opensearch_search.py` optionally mirrors tickets into a local OpenSearch index for full-text search.
-- **External Services** — `dispatch_notifier.py` publishes a dispatch event to AWS SNS via **LocalStack** locally (or real AWS SNS if configured); Ollama serves the local LLM/vision models; OpenSearch serves search — all three are optional and run entirely on the developer's machine.
+
 ---
+### Layers explained
+ 
+| Layer | Modules | Responsibility |
+|---|---|---|
+| **Presentation** | `app.py`, `views.py`, `staff_ui.py`, `layout.py`, `theme.py` | Role-based pages, header (search, bell, user switch), sidebar navigation, design system |
+| **Application / workflow** | `core.py`, `lifecycle.py` | Shared state, seed data, intake, duplicate merge, dispatch, resolution, citizen closure, audit log; the ticket state machine and role rules |
+| **AI** | `grievance_agent.py`, `ai_insights.py`, `evidence.py` | Triage, language detection and gloss, case summaries, priority brief, evidence verification |
+| **SLA / escalation** | `sla_escalation.py`, `hotspots.py` | SLA status, auto-escalation, explainable escalation reports, 24h-vs-24h hotspot detection |
+| **Authorization** | `cedar_eval.py`, `policies.cedar` | Cedar policy evaluation for dispatch, with a Python mirror fallback |
+| **Data / persistence** | `st.session_state` (in `core.py`) | Tickets, audit log and feedback are held in session state (prototype) |
+| **External services** | `dispatch_notifier.py`, `opensearch_search.py`, Ollama | SNS events, full-text search, local LLM and vision model. All are optional and fail soft |
+ 
+---
+ 
+## End-to-End Workflow
+ 
+```mermaid
+flowchart LR
+    A["Citizen reports<br/>text / voice / photo / document"] --> B["Language detection<br/>and gloss"]
+    B --> C["AI triage<br/>department, ward, team, urgency"]
+    C --> D{"Same department and<br/>location already open?"}
+    D -- Yes --> E["Merge as duplicate<br/>raise urgency if higher"]
+    D -- No --> F["Create ticket<br/>NEW to AI TRIAGED to ASSIGNED"]
+    E --> G["Dispatch crew<br/>Cedar check + SNS event"]
+    F --> G
+    G --> H["Technician submits<br/>photo evidence"]
+    H --> I["AI evidence verification"]
+    I --> J{"Urgency 4 or 5?"}
+    J -- Yes --> K["Officer approval"]
+    J -- No --> L["Resolved"]
+    K --> L
+    L --> M{"Citizen response"}
+    M -- Confirms --> N["Citizen verified, then Closed"]
+    M -- Disputes --> O["Reopened and escalated<br/>to Supervisor"]
+    O --> G
+```
+ 
+| Stage | What happens |
+|---|---|
+| Report | Complaint text is captured with optional location and category |
+| Triage | Department, ward, team, urgency, priority label and recommended action are produced |
+| Duplicate check | Same department and same known location as an active ticket → merged |
+| Ticket | New ticket goes `NEW → AI TRIAGED → ASSIGNED` |
+| Dispatch | A role dispatches; Cedar returns ALLOW/DENY; on ALLOW an SNS event is published and the ticket moves to `IN PROGRESS` |
+| Evidence | Photo + notes are verified; failing evidence is flagged for review |
+| Approval | Urgency ≥ 4 goes through `AWAITING APPROVAL` |
+| SLA | Every rerun re-evaluates SLA status and escalates when thresholds pass |
+| Closure | Citizen confirms (`CITIZEN VERIFIED`) and an officer closes, or the citizen disputes and the ticket returns to `IN PROGRESS` |
+| Monitoring | Supervisors watch the whole flow through dashboards |
+ 
+---
+ 
+## AI & Intelligent Automation
+ 
+| Feature | Type | Input → Output | Where used | If AI/service is unavailable |
+|---|---|---|---|---|
+| **Complaint triage** (`grievance_agent.py`) | Keyword rule engine **plus** a Strands Agent using Ollama (`llama3.2` by default) with a Pydantic-typed tool `emit_orchestrated_ticket` | Raw text → department, ward, team, urgency, priority label, recommended action, location hint | `core.ingest_complaint` | The rule-engine result is always computed first. The agent's JSON overrides it only if parsable; on any error, the rules stand |
+| **Language detection + gloss** (`ai_insights.py`) | Dictionary / rule based | Text → `English`, `Hindi` (Devanagari) or `Hinglish` (romanised marker words) + a word-for-word English gloss | Routing card, case summary, registry | Pure local code; the gloss is not machine translation, and Devanagari text has no dictionary entries |
+| **Duplicate detection** (`core.py`) | Rule based | Department + location keyword vs. active tickets → merge or new | Intake | n/a |
+| **AI case summary** (`ai_insights.generate_case_summary`) | Keyword based | Ticket → problem, location, duration open, impact bullets, priority, action | Command center, citizen track view | Pure local code |
+| **AI priority brief** (`ai_insights.generate_priority_brief`) | Scoring heuristic | Tickets + hotspots → ranked wards (score = hotspot score + 5 × critical + complaints) | Supervisor dashboard, Reports | Pure local code |
+| **Hotspot detection** (`hotspots.py`) | Deterministic statistics | Report timestamps → last-24h vs previous-24h growth per ward and department, with "because" reasons | Dashboards, Community | Pure local code |
+| **Resolution evidence check** (`evidence.py`) | Vision model (`llava`) **or** heuristics | Photo + filename + notes + ticket → checks for photo quality, subject, GPS distance (EXIF, ≤ 1.5 km), resolved | Evidence form | Falls back to heuristics (image sanity, EXIF GPS, filename/notes keywords). The UI states which mode ran |
+| **Escalation reasoning** (`sla_escalation.py`) | Rule based | Ticket + SLA → reasons (sensitive sites, hazard keywords, duplicates, disputes) and recommended action | Command center, Escalations page | Pure local code |
+| **Full-text search** (`opensearch_search.py`) | OpenSearch fuzzy `multi_match` | Query → ranked ticket IDs | Header search | Falls back to a substring scan over the same fields |
+ 
+---
+ 
+## SLA & Escalation Engine
+ 
+**SLA** is the response-time target attached to each ticket by urgency:
+ 
+| Urgency | Label | SLA target |
+|:---:|---|---|
+| 5 | Critical | 30 min |
+| 4 | High | 2 h |
+| 3 | Medium | 12 h |
+| 2 | Routine / Low | 24 h |
+| 1 | Low | 72 h |
+ 
+**Status for open tickets**
+ 
+| Status | Rule |
+|---|---|
+| `ON TRACK` | < 70% of the SLA used |
+| `AT RISK` | ≥ 70% used |
+| `BREACHED` | ≥ 100% used |
+| `MET` / `MISSED` | For closed tickets: resolved inside / after the target. The clock stops at `RESOLVED` and restarts if the ticket is reopened |
+ 
+**Escalation chain:** Field Technician → Municipal Officer → Supervisor.
+ 
+- At **100%** of the SLA the ticket escalates to the **Municipal Officer**.
+- At **150%** it escalates to the **Supervisor**.
+- A **citizen dispute** escalates straight to the **Supervisor**.
+- Escalation runs on every app rerun, is idempotent (each level fires once) and writes a note to the ticket history and the audit log.
+Supervisors see this in *Critical & Escalated Tickets*, the *Escalation Queue*, the *Escalations* page and the SLA Compliance card.
+ 
+---
+ 
+## Authorization & Security
+ 
+Dispatching a crew commits money and people, so it is guarded by **Cedar** policies (`policies.cedar`), evaluated by `cedar_eval.py` with the `cedarpy` engine. If `cedarpy` is not installed, a **Python mirror** of the same rules is used and the decision says so.
+ 
+| Policy | Effect |
+|---|---|
+| `EmergencyDispatchPolicy` | Municipal Officers may approve dispatch |
+| `SupervisorFullAuthority` | Supervisors hold full dispatch authority |
+| `NoSelfDispatchOnHighUrgency` | **Forbid** Field Technicians for urgency ≥ 4 |
+| `FieldTechLowUrgencyElectrical` | Field Technicians may self-dispatch only urgency < 4, Electrical & Power, cost ≤ ₹25,000 |
+ 
+- **Protected action:** `ApproveDispatch` (the `ASSIGNED → IN PROGRESS` step).
+- **Where it runs:** `core.dispatch_crew`, called from the command center and the Approvals page.
+- **Explainability:** every decision is stored on the ticket and in the audit log, and shown in **Authorization Details** (flow, principal, action, resource, cost, decision, policy ID, reason, engine). Supervisors can replay decisions in the **Policy simulator**.
+- **Other steps** (approve resolution, close, citizen confirm) are guarded by role lists in `lifecycle.py`, not by Cedar.
+- **SNS via LocalStack:** on an allowed dispatch, `dispatch_notifier.py` publishes a `DISPATCHED_TO_FIELD` event to the `civictech-dispatch-events` topic. Locally this uses **LocalStack** with mock credentials, so no AWS account is needed.
+
+---
+ 
  ## End-to-End Workflow
  
 ```
@@ -334,3 +455,265 @@ Citizen Confirms or Disputes → Closed / Re-opened
 | OpenSearch / `opensearch-py` | `opensearch_search.py`, `core.py`, `staff_ui.render_search` | Indexing tickets on every mutation and fuzzy search |
 | Finch / Docker | `Dockerfile`, compose file | Build and run the whole stack |
 | `lifecycle.py` (dataclass) | `core.py`, `staff_ui.py`, `views.py` | State machine and role-checked transitions |
+
+## Project Structure
+ 
+```text
+CivicFlow/
+├── app.py                  # Entry point: routing, header, sidebar, time machine, auto-escalation
+├── core.py                 # State, seed data, intake, dispatch, resolution, citizen closure, audit log
+├── lifecycle.py            # Ticket state machine and role rules
+├── sla_escalation.py       # SLA targets, status, auto-escalation, escalation reports
+├── hotspots.py             # 24h vs previous-24h hotspot detection
+├── geo_intel.py            # PyDeck heatmap, clusters, markers, ward drill-down
+├── ai_insights.py          # Language detection, gloss, case summary, priority brief
+├── grievance_agent.py      # Strands agent + rule-engine triage
+├── prompts.py              # Alternative triage system prompt (not imported by grievance_agent.py)
+├── evidence.py             # Resolution-evidence verification (llava or heuristics)
+├── cedar_eval.py           # Cedar authorization + Python mirror
+├── policies.cedar          # Dispatch policies
+├── dispatch_notifier.py    # SNS publisher (LocalStack by default)
+├── opensearch_search.py    # Optional OpenSearch index/search with fallback
+├── views.py                # Citizen pages + shared components (command center, evidence, analytics)
+├── staff_ui.py             # Officer / Technician / Supervisor dashboards and pages
+├── layout.py               # Design system CSS, SVG icons, header, sidebar nav
+├── theme.py                # Base theme, brand block, pills, stat cards
+├── Dockerfile
+├── docker-compose.yml      # Compose file for the full stack (use your actual file name)
+├── requirements.txt
+├── docs/
+│   └── images/             # Screenshots and architecture image go here
+└── README.md
+```
+ 
+| File | Responsibility |
+|---|---|
+| `app.py` | Chooses the view by the active role; runs SLA auto-escalation on every rerun |
+| `core.py` | Single source of business actions; re-indexes tickets into OpenSearch after each change |
+| `views.py` | Citizen experience; also hosts shared components used by staff pages. Older `render_officer` / `render_supervisor` remain in the file but are no longer routed |
+| `staff_ui.py` | Staff dashboards and pages, search results, quick actions |
+| `layout.py` | Header with working search, bell and user switch; sidebar with icons; equal-height card CSS |
+ 
+---
+ 
+## Dashboard Screenshots
+ 
+### Citizen Dashboard
+![Citizen Dashboard](docs/images/citizen-dashboard.png)
+*Report form with four intake channels, KPI cards, issue map, common issues and complaint table.*
+ 
+### Municipal Officer Dashboard
+![Municipal Officer Dashboard](docs/images/officer-dashboard.png)
+*SLA-sorted queue, ward map panel, SLA compliance and AI priority brief.*
+ 
+### Field Technician Dashboard
+![Field Technician Dashboard](docs/images/field-technician-dashboard.png)
+*Crew queue limited to assigned and in-progress work.*
+ 
+### Supervisor Dashboard
+![Supervisor Dashboard](docs/images/supervisor-dashboard.png)
+*City heatmap with hotspot ward panel, critical and escalated tickets, department mix, SLA compliance, escalation queue.*
+ 
+### Ticket / Command Center
+![Ticket Command Center](docs/images/ticket-command-center.png)
+*AI case summary, lifecycle, SLA, actions, evidence verification and authorization details.*
+ 
+### AI / Analytics
+![Analytics](docs/images/analytics.png)
+*Category counts, resolution times, ward SLA performance and the AI priority brief.*
+ 
+---
+ 
+## How CivicFlow Solves the Problem
+ 
+| Problem | CivicFlow mechanism | Result |
+|---|---|---|
+| Difficult reporting | Four intake tabs, sample complaints, language detection | Structured tickets from free-form input |
+| Poor routing | Triage agent + rule engine, team and action assigned automatically | Every ticket starts with a department, team and urgency |
+| Duplicate work | Department + location merge | One ticket with a growing report count |
+| Lack of transparency | Lifecycle tracker, notifications, citizen confirm/dispute | Citizens see progress and can challenge a fix |
+| Delayed resolution | Urgency-based SLA targets | Every open ticket has a deadline and a status |
+| SLA failures | Automatic escalation Officer → Supervisor | Breaches surface without anyone remembering to check |
+| Lack of field coordination | Crew queue, Cedar-checked dispatch, SNS event, evidence upload | Clear work items and proof of completion |
+| Unclear authority | Cedar policies, decision log, simulator | Every dispatch decision has a reason |
+| Lack of city-wide visibility | Heatmap, hotspots, analytics, priority brief, reports | Supervisors can see where to act first |
+ 
+## Why CivicFlow
+ 
+| Characteristic | In the implementation |
+|---|---|
+| **End-to-end lifecycle** | Eight states from `NEW` to `CLOSED`, with reopen on dispute |
+| **Four role experiences** | Separate navigation, dashboards and permissions per role |
+| **Explainable AI** | Every AI output is traceable to input signals; fallbacks are stated in the UI |
+| **SLA-aware workflow** | Targets, status, automatic escalation and reasons |
+| **Evidence-based resolution** | Photo required; verified by vision model or transparent heuristics; failed evidence flagged |
+| **Policy-guarded actions** | Cedar policies with logged, explainable decisions |
+| **Runs fully local** | LLM, events and search run in local containers; no cloud account needed |
+| **Fails soft** | Ollama, SNS, OpenSearch and cedarpy are all optional with fallbacks |
+ 
+---
+ 
+## Quick Demo
+ 
+1. **Open the app.** You start as **Citizen (Priya Singh)** with 4 demo complaints.
+2. **New ticket:** *Report an Issue → Try a sample complaint →* "Sanitation overflow (Ward 14)" → **Submit Complaint**. A new ticket is created; the routing card shows the Hinglish language tag and an English gloss.
+3. **Duplicate merge:** submit the "High voltage cable snapped" sample. It merges into the existing Dayalpur electrical ticket (`CF-1042`).
+4. **Switch role** (header → **Switch**) to **Field Technician**. Open `CF-1042` in *Ticket Center* and press **Dispatch crew**: Cedar returns **DENY** (urgency ≥ 4) and *Authorization Details* explains why.
+5. **Switch to Municipal Officer** → *Approvals* → **Dispatch** `CF-1042`: **ALLOW**; an SNS event is published (or recorded locally if LocalStack is offline).
+6. **Switch to Field Technician** → open an `IN PROGRESS` ticket → upload any JPG/PNG (≥ 200 px) with notes such as "cable replaced" → review the AI verification → **Submit Resolution**.
+7. **Switch to Officer** → *Approvals* → **Approve** the resolution.
+8. **Switch to Citizen** → *Track Status* → **👎** with a reason: the ticket reopens and escalates to the Supervisor. (Or **👍** to confirm.)
+9. **Sidebar → Time machine → +2h.** Switch to **Supervisor** → *Dashboard*: watch SLA breaches, the *Escalation Queue* and *Critical & Escalated Tickets*.
+10. **Supervisor extras:** *Team Management* (reassign a ticket), *Reports* (priority brief + CSV), *Policy & Authorization* (simulator).
+---
+ 
+## Getting Started
+ 
+### Prerequisites
+ 
+| Requirement | Needed for |
+|---|---|
+| Python 3.11+ | Running the app |
+| `pip` | Installing dependencies |
+| Ollama with `llama3.2` and `llava` |  Agent triage and vision verification (rules/heuristics are used otherwise) |
+| LocalStack (SNS) |  SNS events on dispatch |
+| OpenSearch |  Fuzzy ticket search |
+| Finch or Docker |  One-command full stack |
+ 
+### Clone and install
+ 
+```bash
+git clone <repository-url>
+cd CivicFlow
+ 
+# Linux / macOS
+python3 -m venv .venv
+source .venv/bin/activate
+ 
+# Windows (PowerShell)
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+ 
+pip install -r requirements.txt
+```
+
+ 
+## Running the Application
+ 
+**Option A: app only** (everything optional degrades gracefully)
+ 
+```bash
+streamlit run app.py
+```
+ 
+Open **http://localhost:8501**.
+ 
+**Option B: full local stack with Finch** (app + Ollama + LocalStack + OpenSearch)
+ 
+```bash
+finch compose up -d
+ 
+# one-time setup
+finch compose exec ollama ollama pull llama3.2
+finch compose exec ollama ollama pull llava
+finch compose exec localstack awslocal sns create-topic --name civictech-dispatch-events
+```
+ 
+Then open **http://localhost:8501**. The compose file sets the service URLs for the app container.
+ 
+**Option C: image only**
+ 
+```bash
+finch build -t civicflow .
+finch run -p 8501:8501 civicflow
+```
+---
+ 
+## Future Scope
+ 
+> These are possibilities, **not** implemented features.
+ 
+- Real authentication and identity integration
+- Production database instead of session state
+- Managed cloud deployment (managed SNS and search endpoints are already selectable through environment variables)
+- Real speech-to-text for voice and computer-vision analysis of citizen photos
+- Proper machine translation and Devanagari support
+- Geocoding and real ward boundaries instead of a fixed location table
+- Real-time push/SMS notifications to citizens
+- Mobile application
+- Predictive maintenance and forecasting on historical tickets
+- Crew rosters, per-technician assignment and availability
+## Impact
+ 
+| Audience | Value |
+|---|---|
+| **Citizens** | Easier reporting in their own language, visibility of progress, a way to dispute a fix |
+| **Municipal Officers** | A prioritised queue, AI case summaries, clear approval tasks, audit trail |
+| **Field Teams** | Actionable work items with context, guardrails on dispatch, evidence-based completion |
+| **Supervisors** | City-wide visibility, SLA monitoring, escalation management, analytics and reports |
+ 
+## Design & UX
+ 
+- **Role-specific dashboards** with their own sidebar navigation.
+- **Consistent design system** in `layout.py`: Inter typeface, KPI cards, card containers, pill badges and inline SVG icons.
+- **Status colours:** red / orange / yellow / green for urgency; coloured pills for lifecycle state and SLA status.
+- **Information hierarchy:** KPI row first, then map and critical items, then analytics and operations cards.
+- **Maps and analytics:** PyDeck heatmap with ward clusters, department bars, SLA donut, Streamlit charts.
+- **Action-oriented flows:** buttons open the relevant ticket, page or approval directly.
+- **Desktop-first:** designed for a wide layout.
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
