@@ -124,7 +124,9 @@ At its core, CivicFlow is a **Streamlit application with a single shared in-memo
 | **Community** | Active city hotspots plus a short list of civic tips | Civic awareness beyond the citizen's own complaints |
 | **Help & Support** | An urgent-helpline callout and an FAQ covering routing, SLA targets, disputing a fix, and language support | Answers the most common "how does this work" questions in-app |
  
-![Citizen Dashboard](docs/images/citizen-dashboard.png)
+
+<img width="1916" height="970" alt="image" src="https://github.com/user-attachments/assets/3dd28092-06a2-4a7a-9f51-9fc95bb9a17d" />
+
  
 ### 2 Municipal Officer
  
@@ -139,7 +141,8 @@ At its core, CivicFlow is a **Streamlit application with a single shared in-memo
 | **Registry & Audit** | The full ticket registry and the authorization/lifecycle/escalation audit log |
 | **Notifications** | SLA-risk/breach alerts for tickets in the officer's active set, plus city-wide broadcasts they can send |
  
-![Municipal Officer Dashboard](docs/images/officer-dashboard.png)
+<img width="1917" height="967" alt="image" src="https://github.com/user-attachments/assets/1f4bf5ee-10fc-49ac-aecc-4047f4a31a3a" />
+
  
 ### 3 Field Technician
  
@@ -153,7 +156,8 @@ At its core, CivicFlow is a **Streamlit application with a single shared in-memo
  
 This role is the bridge between the digital ticket and the physical repair: it turns an abstract "ASSIGNED" ticket into a concrete work order with location, urgency, and a required proof-of-work step.
  
-![Field Technician Dashboard](docs/images/field-technician-dashboard.png)
+<img width="1917" height="967" alt="image" src="https://github.com/user-attachments/assets/7f18ea4a-f389-4119-bd21-ed8087d9d2f5" />
+
  
 ### 4 Supervisor
  
@@ -175,7 +179,8 @@ This role is the bridge between the digital ticket and the physical repair: it t
 | **Reports** | Downloadable registry CSV plus the full AI Priority Brief |
 | **Notifications** | SLA alerts plus the ability to send a city-wide broadcast |
  
-![Supervisor Dashboard](docs/images/supervisor-dashboard.png)
+<img width="1910" height="916" alt="image" src="https://github.com/user-attachments/assets/22693941-7e4d-4100-bd2d-935f2c55e9f1" />
+
  
 ---
 ## Feature Matrix
@@ -507,20 +512,50 @@ CivicFlow/
 *SLA-sorted queue, ward map panel, SLA compliance and AI priority brief.*
  
 ### Field Technician Dashboard
-![Field Technician Dashboard](docs/images/field-technician-dashboard.png)
-*Crew queue limited to assigned and in-progress work.*
- 
+
+My Crew Queue Page
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/b8961342-9953-4cc5-873d-7db5b5f78331" width="48%">
+  <img src="https://github.com/user-attachments/assets/1620fec0-d754-4d5a-b75a-e2561b8eac2c" width="48%">
+</p>
+Ticket Center Page
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/690e067f-0170-45b1-b0ed-08140af034a9" width="48%">
+  <img src="https://github.com/user-attachments/assets/77113213-0d7d-487a-b0c0-8b39d6e5dcc0" width="48%">
+</p>
+Map Page
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/abb98cbd-5d36-4f33-aea6-6b41e93bdabc" width="48%">
+  <img src="https://github.com/user-attachments/assets/b89d84c0-91c6-45b4-8258-b4d0e508ffe9" width="48%">
+</p>
+Notification Page
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/91c16245-f9a6-4f8f-9283-7ec905da23ef" width="48%">
+</p>
+
 ### Supervisor Dashboard
-![Supervisor Dashboard](docs/images/supervisor-dashboard.png)
 *City heatmap with hotspot ward panel, critical and escalated tickets, department mix, SLA compliance, escalation queue.*
+<img width="1912" height="915" alt="image" src="https://github.com/user-attachments/assets/664d4872-946c-48b8-9f77-77399c67fe6f" />
+<img width="1915" height="903" alt="image" src="https://github.com/user-attachments/assets/77defeca-7ef1-4bed-b933-b40c95b2c099" />
+
+<img width="1917" height="913" alt="image" src="https://github.com/user-attachments/assets/b8792180-3926-4969-85d2-847accd9a1ac" />
+
  
 ### Ticket / Command Center
-![Ticket Command Center](docs/images/ticket-command-center.png)
 *AI case summary, lifecycle, SLA, actions, evidence verification and authorization details.*
+<img width="1912" height="925" alt="image" src="https://github.com/user-attachments/assets/9c64d8c8-c0c7-4d97-b912-951f4e224878" />
+<img width="1912" height="921" alt="image" src="https://github.com/user-attachments/assets/1d597f72-accd-4981-8bf4-83b51fee84d9" />
+<img width="1917" height="917" alt="image" src="https://github.com/user-attachments/assets/836e6dbf-fa5b-4218-9481-85eec24cb4d4" />
+
+
+
+
  
 ### AI / Analytics
 ![Analytics](docs/images/analytics.png)
 *Category counts, resolution times, ward SLA performance and the AI priority brief.*
+<img width="1917" height="911" alt="image" src="https://github.com/user-attachments/assets/38602ea2-cc2f-493b-8f70-ed02e36230ea" />
+
  
 ---
  
